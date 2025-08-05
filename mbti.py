@@ -2,11 +2,26 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# Get OpenAI API key from Streamlit secrets or environment
+# Load environment variables for local development
 try:
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-except:
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available in production, that's fine
+
+# Get OpenAI API key from Streamlit secrets or environment
+@st.cache_resource
+def get_openai_client():
+    try:
+        # Try Streamlit secrets first (for cloud deployment)
+        api_key = st.secrets["OPENAI_API_KEY"]
+    except (KeyError, FileNotFoundError, AttributeError):
+        # Fallback to environment variable (for local development)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return None
+    
+    return OpenAI(api_key=api_key)
 
 MBTI_INFO = {
     "INTJ": {"emoji": "🏗️", "nickname": "건축가", "color": "#6B46C1"},
@@ -55,6 +70,12 @@ def get_mbti_card(mbti_type):
     """
 
 def generate_mbti_message(mbti_type, theme):
+    # Get client when needed
+    client = get_openai_client()
+    if not client:
+        st.error("⚠️ OpenAI API key not found. Please set OPENAI_API_KEY in Streamlit secrets or environment variables.")
+        return "API 키가 설정되지 않았습니다. 관리자에게 문의하세요."
+    
     prompt = f"""
 당신은 {mbti_type} 유형의 사람에게 오늘 하루를 위한 짧고 인사이트 있는 메시지를 주는 AI입니다.
 
@@ -68,16 +89,19 @@ def generate_mbti_message(mbti_type, theme):
 짧고 공감되며, 감성적으로 써주세요.
 """
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "당신은 공감 능력이 뛰어난 MBTI 전문가입니다."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.8
-    )
-
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "당신은 공감 능력이 뛰어난 MBTI 전문가입니다."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.8
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"⚠️ 메시지 생성 중 오류가 발생했습니다: {str(e)}")
+        return "죄송합니다. 메시지 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
 st.set_page_config(
     page_title="MBTI 데일리 메시지", 
@@ -184,7 +208,9 @@ with right_col:
     if generate_button:
         with st.spinner("🤖 AI가 메시지를 작성하는 중..."):
             output = generate_mbti_message(mbti_type, theme)
-            st.balloons()
+            if output and "오류가 발생했습니다" not in output:
+                st.balloons()
+            
             selected_info = MBTI_INFO[mbti_type]
             st.markdown(f"""
             <div style="text-align: center; margin: 10px 0;">
@@ -193,6 +219,9 @@ with right_col:
                 </h3>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Safely handle line breaks in output
+            formatted_output = output.replace('\n', '<br>') if output else "메시지를 생성할 수 없습니다."
             
             st.markdown(f"""
             <div style="
@@ -211,7 +240,7 @@ with right_col:
                 text-align: left;
             ">
                 <div style="width: 100%;">
-                    {output.replace(chr(10), '<br>')}
+                    {formatted_output}
                 </div>
             </div>
             """, unsafe_allow_html=True)
