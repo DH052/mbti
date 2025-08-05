@@ -1,25 +1,12 @@
 import streamlit as st
 from openai import OpenAI
-from sentence_transformers import SentenceTransformer
-from langchain.embeddings import HuggingFaceEmbeddings
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-def create_embeddings_model(model_choice):
-    """임베딩 모델 생성"""
-    if "MiniLM" in model_choice:
-        model_name = "sentence-transformers/all-MiniLM-L6-v2"
-    else:
-        model_name = "sentence-transformers/all-mpnet-base-v2"
-    
-    return HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
+# Get OpenAI API key from Streamlit secrets or environment
+try:
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+except:
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 MBTI_INFO = {
     "INTJ": {"emoji": "🏗️", "nickname": "건축가", "color": "#6B46C1"},
