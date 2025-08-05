@@ -2,21 +2,17 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# Load environment variables for local development
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # dotenv not available in production, that's fine
+    pass
 
-# Get OpenAI API key from Streamlit secrets or environment
 @st.cache_resource
 def get_openai_client():
     try:
-        # Try Streamlit secrets first (for cloud deployment)
         api_key = st.secrets["OPENAI_API_KEY"]
     except (KeyError, FileNotFoundError, AttributeError):
-        # Fallback to environment variable (for local development)
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             return None
@@ -220,7 +216,6 @@ with right_col:
             </div>
             """, unsafe_allow_html=True)
             
-            # Safely handle line breaks in output
             formatted_output = output.replace('\n', '<br>') if output else "메시지를 생성할 수 없습니다."
             
             st.markdown(f"""
